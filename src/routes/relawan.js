@@ -1,22 +1,28 @@
 const express = require('express');
 const router = express.Router();
-// WAJIB PAKAI KURUNG KURAWAL { } KARENA db.js MENG-EXPORT OBJECT
 const { pool } = require('../db'); 
 
 router.post('/', async (req, res) => {
     console.log("➡️ Menerima Request Pendaftaran..."); 
+    console.log("📦 req.body:", JSON.stringify(req.body, null, 2)); // DEBUG: Lihat struktur data
 
-    // Cek darurat: Apakah pool terbaca?
     if (!pool) {
-        console.error("❌ FATAL: Variabel 'pool' undefined. Cek export db.js!");
-        return res.status(500).json({ message: "Server Misconfiguration: Database pool missing" });
+        console.error("❌ FATAL: Variabel 'pool' undefined.");
+        return res.status(500).json({ message: "Server Misconfiguration" });
     }
 
     try {
-        // Parsing Data Aman
-        const payload = typeof req.body.relawanData === 'string' 
-            ? JSON.parse(req.body.relawanData) 
-            : req.body;
+        // ✅ PERBAIKAN: Ambil data langsung dari req.body
+        const payload = req.body;
+
+        // Validasi data wajib
+        if (!payload.full_name || !payload.email || !payload.phone_number) {
+            console.error("❌ Validasi gagal: Field wajib kosong");
+            return res.status(400).json({ 
+                success: false, 
+                message: "Nama, email, dan nomor telepon wajib diisi" 
+            });
+        }
 
         console.log("📦 Data siap insert untuk:", payload.full_name); 
 
@@ -29,14 +35,13 @@ router.post('/', async (req, res) => {
             RETURNING id
         `;
 
-        // Gunakan string kosong/default biar tidak error constraint database
         const values = [
-            String(payload.activity_id || '0'),
-            payload.full_name || '-',
+            payload.activity_id || 0,
+            payload.full_name,
             payload.date_of_birth || null,
             payload.gender || '-',
-            payload.phone_number || '-',
-            payload.email || '-',
+            payload.phone_number,
+            payload.email,
             payload.profession || '-',
             payload.full_address || '-',
             payload.domicile_city || '-',
@@ -53,18 +58,18 @@ router.post('/', async (req, res) => {
         
         res.status(201).json({ 
             success: true, 
-            message: "Berhasil disimpan", 
+            message: "Pendaftaran berhasil disimpan", 
             id: result.rows[0].id 
         });
 
     } catch (err) {
-        // Log Error Asli ke Railway Console (PENTING UNTUK DIAGNOSIS)
-        console.error("🔥 ERROR DATABASE:", err); 
+        console.error("🔥 ERROR DATABASE:", err.message); 
+        console.error("Stack trace:", err.stack);
         
         res.status(500).json({ 
             success: false, 
             message: "Gagal menyimpan data", 
-            errorDetail: err.message // Kirim pesan error ke frontend biar kelihatan
+            errorDetail: err.message
         });
     }
 });
