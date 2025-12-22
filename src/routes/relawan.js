@@ -4,8 +4,10 @@ const { pool } = require('../db');
 
 router.post('/', async (req, res) => {
     try {
+        // Parsing data dari frontend
         const data = typeof req.body.relawanData === 'string' 
-            ? JSON.parse(req.body.relawanData) : req.body;
+            ? JSON.parse(req.body.relawanData) 
+            : req.body;
 
         const query = `
             INSERT INTO registrations (
@@ -16,19 +18,39 @@ router.post('/', async (req, res) => {
             RETURNING id
         `;
 
+        // Pastikan tidak ada undefined yang masuk ke database
         const values = [
-            String(data.activity_id), data.full_name, data.date_of_birth, data.gender,
-            data.phone_number, data.email, data.profession, data.full_address,
-            data.domicile_city, data.institution, data.source_info, data.keahlian,
-            data.commitment_time, data.chosen_division, data.motivation_text
+            String(data.activity_id || '0'),
+            data.full_name || 'Tanpa Nama',
+            data.date_of_birth || null,
+            data.gender || '-',
+            data.phone_number || '-',
+            data.email || '-',
+            data.profession || '-',
+            data.full_address || '-',
+            data.domicile_city || '-',
+            data.institution || '-',
+            data.source_info || '-',
+            data.keahlian || '-',
+            data.commitment_time || '-',
+            data.chosen_division || '-',
+            data.motivation_text || '-'
         ];
 
         const result = await pool.query(query, values);
-        res.status(201).json({ success: true, message: "Berhasil!", id: result.rows[0].id });
+        res.status(201).json({ 
+            success: true, 
+            message: "Pendaftaran Berhasil Disimpan!", 
+            id: result.rows[0].id 
+        });
 
     } catch (err) {
         console.error("DATABASE ERROR:", err.message);
-        res.status(500).json({ success: false, message: "Gagal menyimpan data", error: err.message });
+        res.status(500).json({ 
+            success: false, 
+            message: "Gagal menyimpan data", 
+            error: err.message 
+        });
     }
 });
 
