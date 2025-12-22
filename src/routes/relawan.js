@@ -5,8 +5,7 @@ const { pool } = require('../db');
 router.post('/', async (req, res) => {
     try {
         const data = typeof req.body.relawanData === 'string' 
-            ? JSON.parse(req.body.relawanData) 
-            : req.body;
+            ? JSON.parse(req.body.relawanData) : req.body;
 
         const query = `
             INSERT INTO registrations (
@@ -18,21 +17,10 @@ router.post('/', async (req, res) => {
         `;
 
         const values = [
-            String(data.activity_id),
-            data.full_name || '',
-            data.date_of_birth || null,
-            data.gender || '',
-            data.phone_number || '',
-            data.email || '',
-            data.profession || '',
-            data.full_address || '',
-            data.domicile_city || '',
-            data.institution || '',
-            data.source_info || '',
-            data.keahlian || '',
-            data.commitment_time || '',
-            data.chosen_division || '',
-            data.motivation_text || ''
+            String(data.activity_id), data.full_name, data.date_of_birth, data.gender,
+            data.phone_number, data.email, data.profession, data.full_address,
+            data.domicile_city, data.institution, data.source_info, data.keahlian,
+            data.commitment_time, data.chosen_division, data.motivation_text
         ];
 
         const result = await pool.query(query, values);
