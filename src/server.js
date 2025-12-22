@@ -1,15 +1,16 @@
 const app = require('./app');
-const { testDatabaseConnection } = require('./db'); 
+// WAJIB PAKAI KURUNG KURAWAL { } AGAR TIDAK ERROR "NOT A FUNCTION"
+const { testConnection } = require('./db'); 
 
 const PORT = process.env.PORT || 8080;
 
-testDatabaseConnection().then((isConnected) => {
-    if (isConnected) {
-        app.listen(PORT, '0.0.0.0', () => {
-            console.log(`🚀 Server Railway Aktif di Port ${PORT}`);
-        });
-    } else {
-        console.error('❌ Server berhenti karena masalah database.');
-        process.exit(1);
-    }
+testConnection().then((success) => {
+  if (success) {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Server berjalan aman di port ${PORT}`);
+    });
+  } else {
+    console.error('💀 Server mati: Koneksi DB gagal.');
+    process.exit(1);
+  }
 });

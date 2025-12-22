@@ -1,19 +1,24 @@
 const express = require('express');
 const router = express.Router();
+// WAJIB PAKAI KURUNG KURAWAL { } KARENA db.js MENG-EXPORT OBJECT
 const { pool } = require('../db'); 
 
 router.post('/', async (req, res) => {
-    // Log ini sangat penting agar Anda bisa lihat di Railway Logs apa yang sebenarnya masuk
-    console.log("DATA DARI FRONTEND:", req.body);
+    console.log("➡️ Menerima Request Pendaftaran..."); // Cek log ini di Railway nanti
+
+    // Cek darurat: Apakah pool terbaca?
+    if (!pool) {
+        console.error("❌ FATAL: Variabel 'pool' undefined. Cek export db.js!");
+        return res.status(500).json({ message: "Server Misconfiguration: Database pool missing" });
+    }
 
     try {
-        // Parsing data: Menangani jika data dikirim sebagai string atau object
-        let data = req.body;
-        if (req.body.relawanData) {
-            data = typeof req.body.relawanData === 'string' 
-                ? JSON.parse(req.body.relawanData) 
-                : req.body.relawanData;
-        }
+        // Parsing Data Aman
+        const payload = typeof req.body.relawanData === 'string' 
+            ? JSON.parse(req.body.relawanData) 
+            : req.body;
+
+        console.log("📦 Data siap insert:", payload.email); // Debugging data
 
         const query = `
             INSERT INTO registrations (
@@ -24,40 +29,42 @@ router.post('/', async (req, res) => {
             RETURNING id
         `;
 
-        // Menggunakan operator || untuk memastikan tidak ada nilai null yang bikin error database
+        // Gunakan string kosong/default biar tidak error constraint database
         const values = [
-            String(data.activity_id || '0'),
-            String(data.full_name || 'No Name'),
-            data.date_of_birth || null,
-            String(data.gender || '-'),
-            String(data.phone_number || '-'),
-            String(data.email || '-'),
-            String(data.profession || '-'),
-            String(data.full_address || '-'),
-            String(data.domicile_city || '-'),
-            String(data.institution || '-'),
-            String(data.source_info || '-'),
-            String(data.keahlian || '-'),
-            String(data.commitment_time || '-'),
-            String(data.chosen_division || '-'),
-            String(data.motivation_text || '-')
+            String(payload.activity_id || '0'),
+            payload.full_name || '-',
+            payload.date_of_birth || null,
+            payload.gender || '-',
+            payload.phone_number || '-',
+            payload.email || '-',
+            payload.profession || '-',
+            payload.full_address || '-',
+            payload.domicile_city || '-',
+            payload.institution || '-',
+            payload.source_info || '-',
+            payload.keahlian || '-',
+            payload.commitment_time || '-',
+            payload.chosen_division || '-',
+            payload.motivation_text || '-'
         ];
 
         const result = await pool.query(query, values);
+        console.log("✅ Insert Berhasil, ID:", result.rows[0].id);
         
-        return res.status(201).json({ 
+        res.status(201).json({ 
             success: true, 
-            message: "Data Berhasil Masuk!", 
+            message: "Berhasil disimpan", 
             id: result.rows[0].id 
         });
 
     } catch (err) {
-        // Ini akan muncul di Railway Logs jika pendaftaran gagal lagi
-        console.error("DATABASE ERROR DETAIL:", err.message);
-        return res.status(500).json({ 
+        // Log Error Asli ke Railway Console (PENTING UNTUK DIAGNOSIS)
+        console.error("🔥 ERROR DATABASE:", err); 
+        
+        res.status(500).json({ 
             success: false, 
             message: "Gagal menyimpan data", 
-            error: err.message 
+            errorDetail: err.message // Kirim pesan error ke frontend biar kelihatan
         });
     }
 });

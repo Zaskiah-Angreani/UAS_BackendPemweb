@@ -1,26 +1,26 @@
-require('dotenv').config(); 
+require('dotenv').config();
 const { Pool } = require('pg');
 
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
-    max: 20,
-    idleTimeoutMillis: 30000 
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }, // Wajib untuk Neon
+  max: 20,
+  idleTimeoutMillis: 30000
 });
 
-async function testDatabaseConnection() {
-    let client;
-    try {
-        client = await pool.connect();
-        await client.query('SELECT 1 + 1'); 
-        console.log('✅ Database Neon Terhubung!');
-        return true;
-    } catch (error) {
-        console.error('❌ Koneksi Database Gagal:', error.message); 
-        return false;
-    } finally {
-        if (client) client.release();
-    }
-}
+// Fungsi test koneksi (dipakai server.js)
+const testConnection = async () => {
+  try {
+    const client = await pool.connect();
+    await client.query('SELECT 1');
+    client.release();
+    console.log('✅ Cek Koneksi Database: BERHASIL');
+    return true;
+  } catch (err) {
+    console.error('❌ Cek Koneksi Database: GAGAL', err.message);
+    return false;
+  }
+};
 
-module.exports = { pool, testDatabaseConnection };
+// EKSPOR SEBAGAI OBJECT (PENTING!)
+module.exports = { pool, testConnection };
