@@ -1,4 +1,4 @@
-const app = require('./app');
+const app = require('./app'); // Pastikan path ini benar sesuai struktur folder Anda
 // WAJIB PAKAI KURUNG KURAWAL { } AGAR TIDAK ERROR "NOT A FUNCTION"
 const { testConnection } = require('./db'); 
 

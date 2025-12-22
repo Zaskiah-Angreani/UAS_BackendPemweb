@@ -4,7 +4,7 @@ const router = express.Router();
 const { pool } = require('../db'); 
 
 router.post('/', async (req, res) => {
-    console.log("➡️ Menerima Request Pendaftaran..."); // Cek log ini di Railway nanti
+    console.log("➡️ Menerima Request Pendaftaran..."); 
 
     // Cek darurat: Apakah pool terbaca?
     if (!pool) {
@@ -18,7 +18,7 @@ router.post('/', async (req, res) => {
             ? JSON.parse(req.body.relawanData) 
             : req.body;
 
-        console.log("📦 Data siap insert:", payload.email); // Debugging data
+        console.log("📦 Data siap insert untuk:", payload.full_name); 
 
         const query = `
             INSERT INTO registrations (
