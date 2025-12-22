@@ -1,11 +1,9 @@
-// routes/relawan.js
 const express = require('express');
 const router = express.Router();
-const { pool } = require('../db'); // Pastikan koneksi DB Neon sudah benar
+const { pool } = require('../db'); 
 
 router.post('/', async (req, res) => {
     try {
-        // Parsing data dari FormData frontend
         const data = typeof req.body.relawanData === 'string' 
             ? JSON.parse(req.body.relawanData) 
             : req.body;
@@ -20,23 +18,30 @@ router.post('/', async (req, res) => {
         `;
 
         const values = [
-            data.activity_id, data.full_name, data.date_of_birth, data.gender, data.phone_number,
-            data.email, data.profession, data.full_address, data.domicile_city, data.institution,
-            data.source_info, data.keahlian, data.commitment_time, data.chosen_division, data.motivation_text
+            String(data.activity_id),
+            data.full_name || '',
+            data.date_of_birth || null,
+            data.gender || '',
+            data.phone_number || '',
+            data.email || '',
+            data.profession || '',
+            data.full_address || '',
+            data.domicile_city || '',
+            data.institution || '',
+            data.source_info || '',
+            data.keahlian || '',
+            data.commitment_time || '',
+            data.chosen_division || '',
+            data.motivation_text || ''
         ];
 
         const result = await pool.query(query, values);
-        res.status(201).json({ 
-            success: true, 
-            registrationId: result.rows[0].id,
-            message: "Data berhasil disimpan ke Neon" 
-        });
+        res.status(201).json({ success: true, message: "Berhasil!", id: result.rows[0].id });
 
     } catch (err) {
-        console.error("DATABASE ERROR:", err.message); 
-        res.status(500).json({ message: "Gagal menyimpan data", error: err.message });
+        console.error("DATABASE ERROR:", err.message);
+        res.status(500).json({ success: false, message: "Gagal menyimpan data", error: err.message });
     }
 });
 
-// WAJIB TAMBAHKAN INI AGAR APP.JS TIDAK CRASH
 module.exports = router;

@@ -1,25 +1,17 @@
-require('dotenv').config(); // Memastikan environment variables terbaca paling awal
 const app = require('./app');
-const testDatabaseConnection = require('./db'); // Mengimpor fungsi tes koneksi dari db.js
+// PERHATIKAN TANDA KURUNG KURAWAL DI BAWAH INI:
+const { testDatabaseConnection } = require('./db'); 
 
 const PORT = process.env.PORT || 8080;
 
-/**
- * Jalankan tes koneksi database sebelum menyalakan server Express.
- * Ini memastikan backend tidak berjalan jika "kabel" ke Neon masih putus.
- */
+// Menjalankan test koneksi sebelum start server
 testDatabaseConnection().then((isConnected) => {
     if (isConnected) {
-        app.listen(PORT, () => {
+        app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 Server running on port ${PORT}`);
-            console.log(`✅ Backend siap melayani request dari Frontend!`);
         });
     } else {
-        console.error('❌ Server gagal dijalankan karena masalah database.');
-        // Berikan jeda sebelum menutup proses jika diperlukan untuk melihat log
-        process.exit(1); 
+        console.error('❌ Server gagal start karena koneksi database error.');
+        process.exit(1);
     }
-}).catch(err => {
-    console.error('❌ Terjadi error fatal saat inisialisasi:', err.message);
-    process.exit(1);
 });
