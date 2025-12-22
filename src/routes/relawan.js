@@ -1,14 +1,15 @@
 // routes/relawan.js
 const express = require('express');
 const router = express.Router();
-const { pool } = require('../db');
+const { pool } = require('../db'); // Pastikan koneksi DB Neon sudah benar
 
 router.post('/', async (req, res) => {
     try {
-        // Karena frontend mengirim FormData, kita parse datanya
-        const data = JSON.parse(req.body.relawanData);
+        // Parsing data dari FormData frontend
+        const data = typeof req.body.relawanData === 'string' 
+            ? JSON.parse(req.body.relawanData) 
+            : req.body;
 
-        // Pastikan nama kolom di query INSERT ini SAMA PERSIS dengan di Neon SQL Editor
         const query = `
             INSERT INTO registrations (
                 activity_id, full_name, date_of_birth, gender, phone_number, 
@@ -25,11 +26,17 @@ router.post('/', async (req, res) => {
         ];
 
         const result = await pool.query(query, values);
-        res.status(201).json({ success: true, registrationId: result.rows[0].id });
+        res.status(201).json({ 
+            success: true, 
+            registrationId: result.rows[0].id,
+            message: "Data berhasil disimpan ke Neon" 
+        });
 
     } catch (err) {
-        // Cetak error lengkap di terminal Railway untuk melihat kolom mana yang salah
         console.error("DATABASE ERROR:", err.message); 
         res.status(500).json({ message: "Gagal menyimpan data", error: err.message });
     }
 });
+
+// WAJIB TAMBAHKAN INI AGAR APP.JS TIDAK CRASH
+module.exports = router;
