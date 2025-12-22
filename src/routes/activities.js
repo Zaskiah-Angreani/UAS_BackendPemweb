@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const activitiesController = require('../controllers/activitiesController');
-const authMiddleware = require('../middleware/authMiddleware'); 
-router.get('/', activitiesController.getAll);  
+
+// Rute ini akan dipanggil oleh axios.get(API_URL) di frontend
+router.get('/', activitiesController.getAll);  
 router.get('/:id', activitiesController.getById); 
 
 module.exports = router;
