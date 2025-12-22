@@ -11,7 +11,7 @@ const authMiddleware = require('./middleware/authMiddleware');
 const app = express();
 app.use(helmet());
 app.use(cors({
-    origin: 'http:satuaksivolunteer.vercel.app', 
+    origin: 'https://satuaksivolunteer.vercel.app', // Tambahkan https:// dan // yang benar
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], 
     credentials: true, 
 }));
