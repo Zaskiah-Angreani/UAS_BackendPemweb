@@ -3,57 +3,47 @@ const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
 
-// 1. IMPORT ROUTES
+// 1. IMPORT ROUTES 
+// Pastikan file-file di bawah ini melakukan 'module.exports = router;'
 const authRoutes = require('./routes/auth');
 const activitiesRoutes = require('./routes/activities');
 const contactRoutes = require('./routes/contact');
 const adminRoutes = require('./routes/admin'); 
-const relawanRoutes = require('./routes/relawan'); 
+const relawanRoutes = require('./routes/relawan'); // Pastikan ini benar
 const authMiddleware = require('./middleware/authMiddleware');
 
 const app = express();
 
 // 2. MIDDLEWARE KEAMANAN & CORS
 app.use(helmet({
-    contentSecurityPolicy: false, // Memudahkan integrasi frontend-backend
+    contentSecurityPolicy: false,
 }));
 
 app.use(cors({
-    origin: 'https://satuaksivolunteer.vercel.app', // Domain Vercel Anda
+    origin: '*', // Sementara gunakan '*' untuk memastikan CORS tidak memblokir saat debugging
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// 3. BODY PARSER
+// 3. BODY PARSER (Wajib untuk membaca JSON dari Frontend)
 app.use(express.json()); 
 app.use(express.urlencoded({ extended: true })); 
 
-// 4. STATIC FOLDER FOR UPLOADS
+// 4. STATIC FOLDER
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // 5. PENDEFINISIAN ROUTE API
-// Pastikan semua variabel route di atas (poin 1) mengekspor router dengan benar!
+// PERBAIKAN: Jangan gunakan 'if (relawanRoutes)' secara kondisional jika itu handler utama
 app.use('/api/auth', authRoutes);
 app.use('/api/activities', activitiesRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/admin', adminRoutes); 
+app.use('/api/registrations', relawanRoutes); // Jalur utama pendaftaran
 
-/** * FIX BARIS 42: Registrasi route pendaftaran relawan
- * Ini yang menyebabkan crash sebelumnya jika relawanRoutes undefined.
- */
-if (relawanRoutes) {
-    app.use('/api/registrations', relawanRoutes);
-    app.use('/v1/relawan', relawanRoutes);
-}
-
-// 6. HEALTH CHECK & PROTECTED ROUTE
+// 6. HEALTH CHECK
 app.get('/', (req, res) => {
     res.send('Server Backend SatuAksi Berjalan Lancar di Railway!');
-});
-
-app.get('/api/protected', authMiddleware, (req, res) => {
-    res.json({ message: 'Akses terproteksi berhasil', user: req.user });
 });
 
 // 7. HANDLING 404
@@ -61,19 +51,14 @@ app.use((req, res) => {
     res.status(404).json({ message: 'Endpoint tidak ditemukan' });
 });
 
-// 8. GLOBAL ERROR HANDLER (Mencegah Crash Total)
+// 8. GLOBAL ERROR HANDLER
 app.use((err, req, res, next) => {
     console.error('CRITICAL_SERVER_ERROR:', err.stack); 
     res.status(500).json({ 
+        success: false,
         message: 'Terjadi kesalahan server internal', 
-        error: process.env.NODE_ENV === 'development' ? err.message : 'Internal Server Error' 
+        error: err.message 
     });
-});
-
-// 9. SERVER PORT BINDING FOR RAILWAY
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server aktif di port ${PORT}`);
 });
 
 module.exports = app;
