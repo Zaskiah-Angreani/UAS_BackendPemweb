@@ -2,7 +2,7 @@ require('dotenv').config(); // Memastikan environment variables terbaca paling a
 const app = require('./app');
 const testDatabaseConnection = require('./db'); // Mengimpor fungsi tes koneksi dari db.js
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 8080;
 
 /**
  * Jalankan tes koneksi database sebelum menyalakan server Express.
