@@ -53,6 +53,8 @@ async function testDatabaseConnection() {
     }
 }
 
-// Export fungsi dan objek pool untuk digunakan di file lain (seperti controller)
-module.exports = testDatabaseConnection; 
-module.exports.pool = pool;
+// PERBAIKAN EKSPOR: Menggabungkan pool dan fungsi test agar bisa dipanggil semua
+module.exports = {
+    pool,
+    testDatabaseConnection
+};
