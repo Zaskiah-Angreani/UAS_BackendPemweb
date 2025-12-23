@@ -1,180 +1,127 @@
 const pool = require('../db');
 
-// 1. Memulai Pendaftaran (Step 0)
+// --- 1. MEMULAI PENDAFTARAN (Inisialisasi ID) ---
 exports.startRegistration = async (req, res) => {
     const userId = req.user.id; 
-    // Sesuaikan: FE mungkin kirim volunteer_id atau activity_id
-    const volunteer_id = req.body.volunteer_id || req.body.activity_id;
-
-    if (!volunteer_id) {
-        return res.status(400).json({ success: false, message: 'ID Volunteer/Activity wajib diisi' });
-    }
-
-    const client = await pool.connect();
+    const activity_id = req.body.activity_id || req.body.volunteer_id || 0;
 
     try {
-        await client.query('BEGIN');   
-        const regQuery = `
-            INSERT INTO volunteer_registrations (user_id, volunteer_id) 
-            VALUES ($1, $2)
-            ON CONFLICT (user_id, volunteer_id) DO NOTHING
-            RETURNING id;
-        `;
-        const regValues = [userId, volunteer_id];
-        let regResult = await client.query(regQuery, regValues);
-        
-        let registrationId;
+        // Cek apakah user sudah pernah mendaftar di aktivitas ini
+        const check = await pool.query(
+            'SELECT id FROM registrations WHERE activity_id = $1 AND email = (SELECT email FROM users WHERE id = $2)',
+            [activity_id, userId]
+        );
 
-        if (regResult.rows.length === 0) {
-            const existingReg = await client.query(
-                'SELECT id FROM volunteer_registrations WHERE user_id = $1 AND volunteer_id = $2',
-                regValues
-            );
-            registrationId = existingReg.rows[0].id;
-            
-            const detailCheck = await client.query(
-                'SELECT status FROM registration_details WHERE registration_id = $1',
-                [registrationId]
-            );
-
-            if (detailCheck.rows.length > 0 && detailCheck.rows[0].status !== 'draft') {
-                await client.query('ROLLBACK');
-                return res.status(409).json({
-                    success: false,
-                    message: 'Anda sudah menyelesaikan pendaftaran untuk aktivitas ini.'
-                });
-            }
-        } else {
-            registrationId = regResult.rows[0].id;
-            const detailQuery = `
-                INSERT INTO registration_details (registration_id, status) 
-                VALUES ($1, 'draft')
-                RETURNING *;
-            `;
-            await client.query(detailQuery, [registrationId]);
+        if (check.rows.length > 0) {
+            return res.status(409).json({ 
+                success: false, 
+                message: 'Anda sudah memulai pendaftaran untuk aktivitas ini.' 
+            });
         }
-        
-        await client.query('COMMIT'); 
+
+        // Buat record awal (Draft)
+        const result = await pool.query(
+            'INSERT INTO registrations (activity_id, full_name, email, phone_number) SELECT $1, name, email, phone FROM users WHERE id = $2 RETURNING id',
+            [activity_id, userId]
+        );
+
         res.status(200).json({
             success: true,
-            message: 'Pendaftaran dimulai.',
-            registration_id: registrationId 
+            registration_id: result.rows[0].id,
+            message: 'Pendaftaran dimulai.'
         });
-
     } catch (err) {
-        await client.query('ROLLBACK'); 
         console.error('Error startRegistration:', err);
-        res.status(500).json({ success: false, message: 'Gagal memulai pendaftaran di database.' });
-    } finally {
-        client.release();
+        res.status(500).json({ success: false, message: 'Gagal memulai pendaftaran.' });
     }
 };
 
-// 2. Update Langkah 1 (Informasi Pribadi) - DISESUAIKAN DENGAN FE
+// --- 2. UPDATE LANGKAH 1 & PENYIMPANAN AKHIR (Mapping FE ke BE) ---
+// Fungsi ini didesain untuk menangani "Kirim Pendaftaran" agar tidak Error 500
 exports.updateStep1 = async (req, res) => {
-    const userId = req.user.id; 
-    const registrationId = req.params.id; 
+    const registrationId = req.params.id;
+    const d = req.body;
 
-    // MAPPING OTOMATIS: Menerima variabel FE atau BE
-    const full_name = req.body.full_name || req.body.namaLengkap;
-    const date_of_birth = req.body.date_of_birth || req.body.tanggalLahir;
-    const gender = req.body.gender;
-    const phone_number = req.body.phone_number || req.body.noTelepon;
-    const profession = req.body.profession;
-    const full_address = req.body.full_address || req.body.alamatLengkap;
-    const domicile_city = req.body.domicile_city || req.body.domisili;
-    const institution = req.body.institution;
-    const source_info = req.body.source_info || req.body.source;
+    // MAPPING: Menyesuaikan variabel bahasa Indonesia dari FE ke Kolom Database
+    const data = {
+        full_name: d.namaLengkap || d.full_name,
+        date_of_birth: d.tanggalLahir || d.date_of_birth,
+        gender: d.gender,
+        phone_number: d.noTelepon || d.phone_number,
+        email: d.email,
+        profession: d.profession,
+        full_address: d.alamatLengkap || d.full_address,
+        domicile_city: d.domisili || d.domicile_city,
+        institution: d.institution || '-',
+        source_info: d.source || d.source_info,
+        keahlian: Array.isArray(d.keahlian) ? d.keahlian.join(', ') : (d.keahlian || d.skills),
+        chosen_division: d.divisi || d.chosen_division,
+        motivation_text: d.motivasi || d.motivation_text,
+        commitment_time: d.commitment_time || 'Fleksibel'
+    };
 
-    // Validasi agar tidak Error 500 karena data kosong
-    if (!full_name || !domicile_city) { 
-        return res.status(400).json({ 
-            success: false, 
-            message: 'Nama Lengkap (namaLengkap) dan Domisili (domisili) wajib diisi' 
-        });
+    // Validasi Kolom NOT NULL sesuai skema Neon
+    if (!data.full_name || !data.phone_number || !data.email) {
+        return res.status(400).json({ success: false, message: 'Nama, Email, dan Telepon wajib diisi.' });
     }
 
     try {
-        const authCheck = await pool.query(
-            'SELECT user_id FROM volunteer_registrations WHERE id = $1 AND user_id = $2',
-            [registrationId, userId]
-        );
-
-        if (authCheck.rows.length === 0) {
-            return res.status(403).json({ success: false, message: 'Izin ditolak.' });
-        }
-
         const query = `
-            UPDATE registration_details 
+            UPDATE registrations 
             SET full_name=$1, date_of_birth=$2, gender=$3, phone_number=$4, profession=$5, 
-                full_address=$6, domicile_city=$7, institution=$8, source_info=$9
-            WHERE registration_id = $10 
+                full_address=$6, domicile_city=$7, institution=$8, source_info=$9,
+                keahlian=$10, chosen_division=$11, motivation_text=$12, commitment_time=$13
+            WHERE id = $14 
             RETURNING *;
         `;
+        
         const values = [
-            full_name, date_of_birth, gender, phone_number, profession, 
-            full_address, domicile_city, institution, source_info, registrationId
+            data.full_name, data.date_of_birth, data.gender, data.phone_number, data.profession, 
+            data.full_address, data.domicile_city, data.institution, data.source_info,
+            data.keahlian, data.chosen_division, data.motivation_text, data.commitment_time,
+            registrationId
         ];
         
         const result = await pool.query(query, values);
 
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Data pendaftaran tidak ditemukan.' });
+        }
+
         // Kembalikan data lengkap agar FE tidak error "reading full_name"
         res.status(200).json({
             success: true,
-            message: 'Data berhasil disimpan.',
+            message: 'Pendaftaran berhasil diperbarui/disimpan.',
             data: result.rows[0] 
         });
 
     } catch (err) {
-        console.error('Error updateStep1:', err);
-        res.status(500).json({ success: false, message: 'Gagal simpan BE: ' + err.message });
+        console.error('Error updateStep:', err);
+        res.status(500).json({ success: false, message: 'Gagal simpan ke Database: ' + err.message });
     }
 };
 
-// 3. Ambil Riwayat Pendaftaran
+// --- 3. AMBIL DATA PENDAFTARAN USER ---
 exports.getRegistrationsByUser = async (req, res) => {
     try {
-        const user_id = req.user.id; 
-
+        const user_email = req.user.email; 
         const result = await pool.query(
-            `SELECT 
-                r.id AS registration_id, r.registered_at, 
-                v.title, v.category, v.event_date, v.event_time, 
-                d.status AS registration_status,
-                d.full_name -- Pastikan ini ikut dikirim ke FE
-            FROM volunteer_registrations r
-            JOIN volunteers v ON r.volunteer_id = v.id
-            LEFT JOIN registration_details d ON r.id = d.registration_id
-            WHERE r.user_id = $1
-            ORDER BY r.registered_at DESC`,
-            [user_id]
+            'SELECT * FROM registrations WHERE email = $1 ORDER BY submitted_at DESC',
+            [user_email]
         );
-
         res.status(200).json({ success: true, data: result.rows });
     } catch (err) {
-        console.error('Error getRegistrationsByUser:', err);
-        res.status(500).json({ success: false, message: 'Gagal mengambil data.' });
+        res.status(500).json({ success: false, message: 'Gagal mengambil riwayat.' });
     }
 };
 
-// 4. Batalkan Pendaftaran
+// --- 4. HAPUS PENDAFTARAN ---
 exports.deleteRegistration = async (req, res) => {
     try {
-        const { id } = req.params; 
-        const user_id = req.user.id; 
-
-        const result = await pool.query(
-            'DELETE FROM volunteer_registrations WHERE id = $1 AND user_id = $2 RETURNING id',
-            [id, user_id]
-        );
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ success: false, message: 'Data tidak ditemukan.' });
-        }
-
-        res.status(200).json({ success: true, message: 'Pendaftaran dibatalkan.' });
+        const { id } = req.params;
+        await pool.query('DELETE FROM registrations WHERE id = $1', [id]);
+        res.status(200).json({ success: true, message: 'Pendaftaran dihapus.' });
     } catch (err) {
-        console.error('Error deleteRegistration:', err);
-        res.status(500).json({ success: false, message: 'Gagal membatalkan.' });
+        res.status(500).json({ success: false, message: 'Gagal menghapus.' });
     }
 };
