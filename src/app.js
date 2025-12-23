@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const path = require('path');
 
 // 1. IMPORT ROUTES 
+// Pastikan semua file di folder routes menggunakan 'module.exports = router;'
 const authRoutes = require('./routes/auth');
 const activitiesRoutes = require('./routes/activities');
 const contactRoutes = require('./routes/contact');
@@ -12,76 +13,79 @@ const relawanRoutes = require('./routes/relawan');
 
 const app = express();
 
-// 2. MIDDLEWARE KEAMANAN & CORS
+// 2. MIDDLEWARE KEAMANAN (HELMET)
 app.use(helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: false, // Memudahkan integrasi frontend-backend
 }));
 
+// 3. KONFIGURASI CORS
+const allowedOrigins = [
+    'https://satuaksivolunteer.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:5173'
+];
+
 app.use(cors({
-    origin: [
-        'https://satuaksivolunteer.vercel.app',
-        'http://localhost:3000',
-        'http://localhost:5173'
-    ], // ✅ Lebih aman daripada '*'
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// 3. BODY PARSER (Wajib untuk membaca JSON dari Frontend)
-app.use(express.json({ limit: '10mb' })); // ✅ Tambah limit untuk file besar
+// 4. BODY PARSER
+// Menangani data JSON dan Form-Data dengan batas ukuran 10mb
+app.use(express.json({ limit: '10mb' })); 
 app.use(express.urlencoded({ extended: true, limit: '10mb' })); 
 
-// 4. LOGGING MIDDLEWARE (untuk debugging)
+// 5. REQUEST LOGGER (Sangat membantu untuk debugging di Railway)
 app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} | ${req.method} ${req.path}`);
-    console.log('Body:', req.body);
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
     next();
 });
 
-// 5. STATIC FOLDER
+// 6. STATIC FOLDER
+// Untuk akses file upload (CV/Portofolio)
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
-// 6. PENDEFINISIAN ROUTE API
+// 7. PENDEFINISIAN ROUTE API
 app.use('/api/auth', authRoutes);
 app.use('/api/activities', activitiesRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/admin', adminRoutes); 
-app.use('/api/registrations', relawanRoutes); // ✅ Pastikan ini mengarah ke router.post('/')
+app.use('/api/registrations', relawanRoutes); // Jalur utama pendaftaran relawan
 
-// 7. HEALTH CHECK
+// 8. HEALTH CHECK & WELCOME ROUTE
 app.get('/', (req, res) => {
-    res.json({ 
-        status: 'ok',
-        message: 'Server Backend SatuAksi Berjalan Lancar di Railway!',
-        timestamp: new Date().toISOString()
+    res.status(200).json({ 
+        status: 'success',
+        message: 'Backend SatuAksi API is Running',
+        version: '1.0.0'
     });
 });
 
-app.get('/health', (req, res) => {
-    res.json({ 
-        status: 'healthy',
-        database: 'connected', // Bisa ditambah test DB di sini
-        timestamp: new Date().toISOString()
-    });
-});
-
-// 8. HANDLING 404
+// 9. HANDLING 404 (Route Tidak Ditemukan)
 app.use((req, res) => {
-    console.log(`❌ 404 - Route tidak ditemukan: ${req.method} ${req.path}`);
     res.status(404).json({ 
         success: false,
-        message: `Endpoint ${req.path} tidak ditemukan` 
+        message: `Endpoint ${req.originalUrl} tidak ditemukan pada server ini.` 
     });
 });
 
-// 9. GLOBAL ERROR HANDLER
+// 10. GLOBAL ERROR HANDLER (Mencegah Server Mati Total)
 app.use((err, req, res, next) => {
-    console.error('🔥 CRITICAL_SERVER_ERROR:', err.stack); 
-    res.status(err.status || 500).json({ 
+    console.error('SERVER_ERROR_LOG:', err.stack);
+    
+    const statusCode = err.status || 500;
+    res.status(statusCode).json({ 
         success: false,
-        message: 'Terjadi kesalahan server internal', 
-        error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message
+        message: err.message || 'Terjadi kesalahan pada internal server',
+        error: process.env.NODE_ENV === 'development' ? err.stack : {} 
     });
 });
 
